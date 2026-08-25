@@ -1,36 +1,80 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Spotify Listening History
 
-## Getting Started
+A local Next.js app that tracks your Spotify listening habits: what you play, how much, and how
+it breaks down by month and year.
 
-First, run the development server:
+## How the data works
+
+Spotify's live API only exposes your **last ~50 played tracks**. There's no live endpoint for
+full historical stats. This app combines two sources:
+
+1. **Extended Streaming History import** — a one-time (or occasional) import of the full history
+   file Spotify emails you on request. This is the only way to get accurate stats going back
+   years.
+2. **Live sync** — while this app is running, it polls "recently played" periodically and stores
+   new plays going forward, so history keeps accumulating after the import goes stale.
+
+## Setup
+
+### 1. Create a Spotify app
+
+1. Go to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) and create an
+   app (any name/description).
+2. In **Settings**, add this exact Redirect URI:
+   ```
+   http://127.0.0.1:3000/api/auth/callback
+   ```
+3. Copy the **Client ID** and **Client Secret**.
+
+### 2. Configure environment
+
+Edit `.env.local` (already created, gitignored) and fill in:
+
+```
+SPOTIFY_CLIENT_ID=your_client_id
+SPOTIFY_CLIENT_SECRET=your_client_secret
+SPOTIFY_REDIRECT_URI=http://127.0.0.1:3000/api/auth/callback
+```
+
+### 3. Run it
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://127.0.0.1:3000](http://127.0.0.1:3000) (use `127.0.0.1`, not `localhost` — it must
+match the redirect URI registered with Spotify) and click **Connect with Spotify**.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 4. Import your full history (recommended)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Go to [spotify.com/account/privacy](https://www.spotify.com/account/privacy/) and request
+   **Extended streaming history**. Spotify emails a ZIP within a few days.
+2. Unzip it, then on the app's **Import history** page upload the
+   `Streaming_History_Audio_*.json` (or `endsong_*.json`) files.
 
-## Learn More
+## Keeping history current while the app is closed
 
-To learn more about Next.js, take a look at the following resources:
+The dashboard auto-syncs every 15 minutes while a browser tab is open, and there's a manual
+**Sync now** button. To keep collecting plays even when you're not looking at the app, schedule a
+periodic call to the sync endpoint, e.g. with Windows Task Scheduler running every 30 minutes:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```powershell
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:3000/api/sync
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+(The app/dev server needs to be running for this to work — it's a local app, not a hosted
+service.)
 
-## Deploy on Vercel
+## Notes / limitations
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- Spotify's "recently played" endpoint doesn't report how much of a track was actually played, so
+  live-synced plays are counted using the track's full duration. Imported history uses the real
+  `ms_played` value from Spotify's export, which is more accurate.
+- Data is stored locally in `data/spotify.db` (SQLite via `sql.js`), gitignored — it's your
+  personal listening history and never leaves your machine.
+- Importing the same export file twice is safe — plays are deduplicated by track + timestamp.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Stack
+
+Next.js (App Router) + TypeScript + Tailwind, SQLite (`sql.js`, no native build step) for storage,
+Recharts for the monthly chart.
