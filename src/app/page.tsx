@@ -168,6 +168,21 @@ export default async function Home({
         <TopList title={`Top tracks — ${rangeLabel}`} items={topTracks} showArtist />
         <TopList title={`Top artists — ${rangeLabel}`} items={topArtists} />
       </div>
+
+      <div className="flex flex-wrap gap-3">
+        <Link
+          href={{ pathname: "/tracks", query: year ? { year } : {} }}
+          className="rounded-full border border-border-strong px-4 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-surface-hover"
+        >
+          View top 500 tracks{year ? ` for ${year}` : " (all time)"} →
+        </Link>
+        <Link
+          href={{ pathname: "/artists", query: year ? { year } : {} }}
+          className="rounded-full border border-border-strong px-4 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-surface-hover"
+        >
+          View all artists{year ? ` for ${year}` : ""} →
+        </Link>
+      </div>
     </div>
   );
 }

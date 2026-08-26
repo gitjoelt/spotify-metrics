@@ -6,7 +6,15 @@ import { MONTH_NAMES } from "@/lib/format";
 const selectClass =
   "rounded-lg border border-border-strong bg-surface px-3 py-2 text-sm font-medium text-text-primary outline-none transition-colors hover:bg-surface-hover focus:border-accent";
 
-export default function YearMonthFilter({ years }: { years: number[] }) {
+export default function YearMonthFilter({
+  years,
+  basePath = "/",
+  showMonth = true,
+}: {
+  years: number[];
+  basePath?: string;
+  showMonth?: boolean;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const year = searchParams.get("year") ?? "";
@@ -23,7 +31,7 @@ export default function YearMonthFilter({ years }: { years: number[] }) {
     if (nextYear && nextMonth) params.set("month", nextMonth);
     else params.delete("month");
 
-    router.push(`/?${params.toString()}`);
+    router.push(`${basePath}?${params.toString()}`);
   }
 
   return (
@@ -41,7 +49,7 @@ export default function YearMonthFilter({ years }: { years: number[] }) {
         ))}
       </select>
 
-      {year && (
+      {showMonth && year && (
         <select
           value={month}
           onChange={(e) => update({ month: e.target.value })}
