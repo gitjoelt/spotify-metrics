@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { formatDuration } from "@/lib/format";
 import type { TopItem } from "@/lib/plays";
 
@@ -29,27 +30,34 @@ export default function TopList({
               </span>
               <div className="min-w-0 flex-1">
                 {item.href ? (
-                  <a
-                    href={item.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block truncate text-sm font-medium text-text-primary hover:text-accent hover:underline"
-                  >
-                    {item.name}
-                  </a>
+                  item.href.startsWith("/") ? (
+                    <Link
+                      href={item.href}
+                      className="block truncate text-sm font-medium text-text-primary hover:text-accent hover:underline"
+                    >
+                      {item.name}
+                    </Link>
+                  ) : (
+                    <a
+                      href={item.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block truncate text-sm font-medium text-text-primary hover:text-accent hover:underline"
+                    >
+                      {item.name}
+                    </a>
+                  )
                 ) : (
                   <p className="truncate text-sm font-medium text-text-primary">{item.name}</p>
                 )}
                 {showArtist && item.artistName && (
                   item.artistHref ? (
-                    <a
+                    <Link
                       href={item.artistHref}
-                      target="_blank"
-                      rel="noopener noreferrer"
                       className="block truncate text-xs text-text-tertiary hover:text-accent hover:underline"
                     >
                       {item.artistName}
-                    </a>
+                    </Link>
                   ) : (
                     <p className="truncate text-xs text-text-tertiary">{item.artistName}</p>
                   )

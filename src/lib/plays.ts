@@ -1,5 +1,5 @@
 import { getDb, run, all, persist } from "@/lib/db";
-import { spotifyTrackUrl, spotifySearchUrl } from "@/lib/format";
+import { spotifyTrackUrl, artistPageUrl } from "@/lib/format";
 
 export interface PlayInput {
   playedAt: string; // ISO 8601
@@ -53,6 +53,7 @@ export async function insertPlays(entries: PlayInput[]): Promise<{ inserted: num
 export interface StatsFilter {
   year?: number;
   month?: number; // 1-12, requires year
+  artist?: string;
 }
 
 function buildWhere(filter: StatsFilter): { clause: string; params: (string | number)[] } {
@@ -65,6 +66,10 @@ function buildWhere(filter: StatsFilter): { clause: string; params: (string | nu
   if (filter.year && filter.month) {
     conds.push("strftime('%m', played_at) = ?");
     params.push(String(filter.month).padStart(2, "0"));
+  }
+  if (filter.artist) {
+    conds.push("artist_name = ?");
+    params.push(filter.artist);
   }
   return {
     clause: conds.length ? `WHERE ${conds.join(" AND ")}` : "",
@@ -109,6 +114,7 @@ export async function getSummary(filter: StatsFilter = {}): Promise<SummaryStats
 export interface TopItem {
   name: string;
   href: string | null;
+  uri?: string;
   artistName?: string;
   artistHref?: string | null;
   plays: number;
@@ -135,8 +141,9 @@ export async function getTopTracks(filter: StatsFilter = {}, limit = 10): Promis
   ).map((r) => ({
     name: r.track_name,
     href: spotifyTrackUrl(r.track_uri),
+    uri: r.track_uri,
     artistName: r.artist_name,
-    artistHref: spotifySearchUrl(r.artist_name),
+    artistHref: artistPageUrl(r.artist_name),
     plays: r.plays,
     msPlayed: r.ms_played,
   }));
@@ -155,7 +162,7 @@ export async function getTopArtists(filter: StatsFilter = {}, limit = 10): Promi
     [...params, limit],
   ).map((r) => ({
     name: r.artist_name,
-    href: spotifySearchUrl(r.artist_name),
+    href: artistPageUrl(r.artist_name),
     plays: r.plays,
     msPlayed: r.ms_played,
   }));

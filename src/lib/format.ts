@@ -7,6 +7,10 @@ export function spotifySearchUrl(query: string): string {
   return `https://open.spotify.com/search/${encodeURIComponent(query)}`;
 }
 
+export function artistPageUrl(artistName: string): string {
+  return `/artists/${encodeURIComponent(artistName)}`;
+}
+
 export function formatDuration(ms: number): string {
   const totalMinutes = Math.round(ms / 60000);
   const hours = Math.floor(totalMinutes / 60);

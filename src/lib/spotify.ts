@@ -8,6 +8,9 @@ export const SCOPES = [
   "user-read-recently-played",
   "user-read-email",
   "user-read-private",
+  "playlist-modify-public",
+  "playlist-modify-private",
+  "ugc-image-upload",
 ].join(" ");
 
 function requireEnv(name: string): string {
@@ -186,6 +189,126 @@ export async function fetchRecentlyPlayed(
   }
   const json = (await res.json()) as { items: RecentlyPlayedItem[] };
   return json.items;
+}
+
+export class SpotifyApiError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+    public insufficientScope: boolean,
+  ) {
+    super(message);
+    this.name = "SpotifyApiError";
+  }
+}
+
+export interface CreatedPlaylist {
+  id: string;
+  url: string;
+}
+
+export async function createPlaylist(
+  accessToken: string,
+  name: string,
+  description: string,
+): Promise<CreatedPlaylist> {
+  // POST /users/{user_id}/playlists was removed for Development Mode apps in
+  // Spotify's February 2026 Web API migration; /me/playlists replaces it.
+  const res = await fetch(`${API_BASE}/me/playlists`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ name, description, public: false }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    const insufficientScope = (res.headers.get("www-authenticate") ?? "").includes(
+      "insufficient_scope",
+    );
+    throw new SpotifyApiError(
+      `Failed to create playlist (${res.status}): ${text}`,
+      res.status,
+      insufficientScope,
+    );
+  }
+  const json = (await res.json()) as { id: string; external_urls: { spotify: string } };
+  return { id: json.id, url: json.external_urls.spotify };
+}
+
+export async function addTracksToPlaylist(
+  accessToken: string,
+  playlistId: string,
+  trackUris: string[],
+): Promise<void> {
+  const CHUNK = 100; // Spotify API limit per request
+  for (let i = 0; i < trackUris.length; i += CHUNK) {
+    const chunk = trackUris.slice(i, i + CHUNK);
+    // /playlists/{id}/tracks was renamed to /playlists/{id}/items in the same migration.
+    const res = await fetch(`${API_BASE}/playlists/${playlistId}/items`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ uris: chunk }),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      const insufficientScope = (res.headers.get("www-authenticate") ?? "").includes(
+        "insufficient_scope",
+      );
+      throw new SpotifyApiError(
+        `Failed to add tracks to playlist (${res.status}): ${text}`,
+        res.status,
+        insufficientScope,
+      );
+    }
+  }
+}
+
+export async function searchArtistImageUrl(
+  accessToken: string,
+  artistName: string,
+): Promise<string | null> {
+  const res = await fetch(
+    `${API_BASE}/search?q=${encodeURIComponent(artistName)}&type=artist&limit=1`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  if (!res.ok) return null;
+  const json = (await res.json()) as {
+    artists?: { items: { images: { url: string }[] }[] };
+  };
+  return json.artists?.items?.[0]?.images?.[0]?.url ?? null;
+}
+
+export async function setPlaylistCoverImage(
+  accessToken: string,
+  playlistId: string,
+  jpeg: Buffer,
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/playlists/${playlistId}/images`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "image/jpeg",
+    },
+    body: jpeg.toString("base64"),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    // This endpoint doesn't set a WWW-Authenticate challenge header even for
+    // a genuine missing-scope rejection — it only shows up in the JSON body.
+    const insufficientScope =
+      (res.headers.get("www-authenticate") ?? "").includes("insufficient_scope") ||
+      /insufficient.*scope/i.test(text);
+    throw new SpotifyApiError(
+      `Failed to set playlist cover (${res.status}): ${text}`,
+      res.status,
+      insufficientScope,
+    );
+  }
 }
 
 export async function disconnect(): Promise<void> {
